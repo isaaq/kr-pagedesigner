@@ -1,43 +1,38 @@
 <template>
   <div class="app">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <div class="main-toolbar">
-      <button class="toolbar-btn" @click="saveDesign"><i class="fas fa-save"></i> 保存</button>
-      <button class="toolbar-btn" @click="openDesign"><i class="fas fa-folder-open"></i> 打开</button>
-      <button class="toolbar-btn" :class="{ active: currentTool === 'pointer' }" @click="setTool('pointer')">
-        <i class="fas fa-mouse-pointer"></i> 指针
+    <div class="top-toolbar">
+      <button class="toolbar-btn" @click="addElement('text')">
+        <i class="fas fa-font"></i> 文本
       </button>
-      <button class="toolbar-btn" :class="{ active: currentTool === 'boxSelect' }" @click="setTool('boxSelect')">
+      <button class="toolbar-btn" @click="addElement('button')">
+        <i class="fas fa-square"></i> 按钮
+      </button>
+      <button class="toolbar-btn" @click="addElement('input')">
+        <i class="fas fa-keyboard"></i> 输入框
+      </button>
+      <button class="toolbar-btn" @click="addElement('div')">
         <i class="fas fa-vector-square"></i> 框选
       </button>
-      <button class="toolbar-btn" @click="showSourceCode"><i class="fas fa-code"></i> 源代码</button>
+      <button class="toolbar-btn" @click="addElement('textarea')">
+        <i class="fas fa-text-height"></i> 文本框
+      </button>
+      <button class="toolbar-btn" @click="addElement('select')">
+        <i class="fas fa-caret-down"></i> 下拉框
+      </button>
+      <button class="toolbar-btn" @click="showSourceCode">
+        <i class="fas fa-code"></i> 源代码
+      </button>
+      <button class="toolbar-btn" @click="toggleSnap">
+        <i class="fas fa-magnet"></i> {{ enableSnap ? '关闭对齐' : '开启对齐' }}
+      </button>
     </div>
     <div class="design-container">
-      <div class="toolbar">
-        <div class="tool-header">
-          <button class="toggle-button" :class="{ active: enableSnap }" @click="toggleSnap">
-            {{ enableSnap ? '关闭对齐' : '开启对齐' }}
-          </button>
-        </div>
-        <div class="tool-items">
-          <div class="tool-category">
-            <div class="tool-category-title">基本元素</div>
-            <div class="tool-item" draggable="true" @dragstart="onDragStart($event, 'text')">
-              <i class="fas fa-font"></i> 文本
-            </div>
-            <div class="tool-item" draggable="true" @dragstart="onDragStart($event, 'button')">
-              <i class="fas fa-square"></i> 按钮
-            </div>
-            <div class="tool-item" draggable="true" @dragstart="onDragStart($event, 'input')">
-              <i class="fas fa-keyboard"></i> 输入框
-            </div>
-            <div class="tool-item" draggable="true" @dragstart="onDragStart($event, 'div')">
-              <i class="fas fa-border-all"></i> 容器/分组
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="design-panel" @dragover.prevent @drop="onDrop">
+      <LeftToolbar />
+      <div class="design-panel" 
+        @dragover.prevent 
+        @drop="onDrop"
+        @mousemove="handleMouseMove"
+        @mouseup="handleMouseUp">
         <!-- 对齐辅助线 -->
         <div v-if="enableSnap && snapLines.vertical" 
              class="snap-line vertical"
@@ -47,12 +42,13 @@
              class="snap-line horizontal"
              :style="{ top: snapLines.horizontal + 'px' }">
         </div>
-        <template v-for="(item, index) in elements" :key="index">
+        <template v-for="(item, index) in elements" :key="item.id">
           <div v-if="item.type === 'text'" 
                :style="item.style"
                class="design-element"
                :class="{ selected: selectedElement === item }"
-               @mousedown="startDrag($event, index)"
+               :data-id="item.id"
+               @mousedown="handleMouseDown"
                @click="selectElement(item)">
             示例文本
           </div>
@@ -60,23 +56,46 @@
                :style="item.style"
                class="design-element"
                :class="{ selected: selectedElement === item }"
-               @mousedown="startDrag($event, index)"
+               :data-id="item.id"
+               @mousedown="handleMouseDown"
                @click="selectElement(item)">
-            <button style="width: 100%; height: 100%;">按钮</button>
+            <button style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc;">按钮</button>
           </div>
           <div v-else-if="item.type === 'input'" 
                :style="item.style"
                class="design-element"
                :class="{ selected: selectedElement === item }"
-               @mousedown="startDrag($event, index)"
+               :data-id="item.id"
+               @mousedown="handleMouseDown"
                @click="selectElement(item)">
-            <input type="text" placeholder="请输入..." style="width: 100%; height: 100%;" />
+            <input type="text" placeholder="请输入..." style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" />
+          </div>
+          <div v-else-if="item.type === 'textarea'" 
+               :style="item.style"
+               class="design-element"
+               :class="{ selected: selectedElement === item }"
+               :data-id="item.id"
+               @mousedown="handleMouseDown"
+               @click="selectElement(item)">
+            <textarea placeholder="请输入..." style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; padding: 4px 8px; box-sizing: border-box;"></textarea>
+          </div>
+          <div v-else-if="item.type === 'select'" 
+               :style="item.style"
+               class="design-element"
+               :class="{ selected: selectedElement === item }"
+               :data-id="item.id"
+               @mousedown="handleMouseDown"
+               @click="selectElement(item)">
+            <select style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; padding: 4px 8px; box-sizing: border-box;">
+              <option value="">请选择</option>
+            </select>
           </div>
           <div v-else-if="item.type === 'div'" 
                :style="item.style"
                class="design-element"
                :class="{ selected: selectedElement === item }"
-               @mousedown="startDrag($event, index)"
+               :data-id="item.id"
+               @mousedown="handleMouseDown"
                @click="selectElement(item)">
             <div class="lock-icon" @click.stop="toggleLock(index)">
               {{ item.locked ? '🔒' : '🔓' }}
@@ -163,17 +182,24 @@
         </div>
       </div>
     </div>
-    <div v-if="showSourceDialog" class="source-dialog">
-      <pre>{{ sourceCode }}</pre>
-      <button @click="closeSourceDialog">关闭</button>
-      <button @click="copySourceCode">复制代码</button>
+    <div v-if="showSourceDialog" class="dialog" style="position: absolute; z-index: 1000; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); width: 600px; height: 400px;">
+      <textarea class="dialog-textarea" v-model="sourceCode" rows="10" style="width: 100%; height: 300px; border-radius: 4px; padding: 10px; border: 1px solid #ccc; resize: none;"></textarea>
+      <div class="dialog-buttons" style="display: flex; justify-content: space-between; margin-top: 10px;">
+        <button @click="saveCode" style="flex: 1; margin-right: 5px;">保存</button>
+        <button @click="closeDialog" style="flex: 1; margin-left: 5px;">关闭</button>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+import LeftToolbar from './components/LeftToolbar.vue'
+
 export default {
   name: 'App',
+  components: {
+    LeftToolbar
+  },
   data() {
     return {
       elements: [],
@@ -183,8 +209,7 @@ export default {
         startX: 0,
         startY: 0,
         originalX: 0,
-        originalY: 0,
-        childrenOriginalPositions: null // 用于存储子元素的初始位置
+        originalY: 0
       },
       resizeState: {
         isResizing: false,
@@ -292,35 +317,36 @@ export default {
   },
   mounted() {
     // 添加全局鼠标事件监听
-    window.addEventListener('mousemove', this.handleResize)
+    window.addEventListener('mousemove', this.handleMouseMove)
     window.addEventListener('mouseup', this.handleMouseUp)
   },
   beforeDestroy() {
     // 移除全局事件监听
-    window.removeEventListener('mousemove', this.handleResize)
+    window.removeEventListener('mousemove', this.handleMouseMove)
     window.removeEventListener('mouseup', this.handleMouseUp)
   },
   methods: {
-    onDragStart(event, type) {
-      event.dataTransfer.setData('type', type)
-    },
     onDrop(event) {
-      const type = event.dataTransfer.getData('type')
-      if (!type) return // 如果没有type，说明是元素的拖动，不需要创建新元素
-      
-      const rect = event.target.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
+      const type = event.dataTransfer.getData('type');
+      if (!type) return;
 
+      const rect = event.target.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+
+      this.addElement(type, x, y);
+    },
+    addElement(type, x = 100, y = 100) {
       const element = {
+        id: Date.now(),
         type,
         style: {
           position: 'absolute',
-          left: x + 'px',
-          top: y + 'px',
+          left: `${x}px`,
+          top: `${y}px`,
           cursor: 'move'
         }
-      }
+      };
 
       // 为 DIV 添加特殊样式
       if (type === 'div') {
@@ -330,40 +356,62 @@ export default {
           border: '2px dashed #4CAF50',
           backgroundColor: 'rgba(76, 175, 80, 0.1)',
           zIndex: 0  // 确保 div 在最底层
-        })
-        element.locked = false
-        this.elements.unshift(element)
+        });
+        element.locked = false;
+        this.elements.unshift(element);
+      } else if (type === 'textarea') {
+        Object.assign(element.style, {
+          width: '200px',
+          height: '100px',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          backgroundColor: '#fff'
+        });
+        this.elements.push(element);
+      } else if (type === 'select') {
+        Object.assign(element.style, {
+          width: '200px',
+          height: '40px',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          backgroundColor: '#fff'
+        });
+        this.elements.push(element);
       } else {
         // 其他元素添加更高的 z-index
-        element.style.zIndex = 1
-        this.elements.push(element)
+        element.style.zIndex = 1;
+        this.elements.push(element);
       }
+
+      // 选中新创建的元素
+      this.selectElement(element);
     },
-    startDrag(event, index) {
-      // 如果是从缩放控制点开始的，不触发拖拽
-      if (event.target.classList.contains('resize-handle')) {
+    handleMouseDown(event) {
+      // 如果点击的是锁定图标，不处理拖拽
+      if (event.target.classList.contains('lock-icon')) {
         return;
       }
 
-      const element = this.elements[index];
+      // 找到被点击的元素的DOM节点
+      const elementNode = event.target.closest('.design-element');
+      if (!elementNode) return;
+
+      // 找到对应的元素数据
+      const elementId = elementNode.dataset.id;
+      const elementIndex = this.elements.findIndex(el => el.id === Number(elementId));
+      if (elementIndex === -1) return;
+
+      const element = this.elements[elementIndex];
       
-      // 如果元素被锁定且不是div，阻止拖动
-      if (element.locked && element.type !== 'div') {
-        return;
-      }
+      // 如果元素被锁定且不是div，不允许拖动
+      if (element.locked && element.type !== 'div') return;
 
-      this.dragState.isDragging = true;
-      this.dragState.elementIndex = index;
-      this.dragState.startX = event.clientX;
-      this.dragState.startY = event.clientY;
-      this.dragState.originalX = parseInt(element.style.left) || 0;
-      this.dragState.originalY = parseInt(element.style.top) || 0;
-
-      // 存储所有子元素的初始位置
+      // 如果是锁定的div，记录子元素的初始位置
+      let childrenPositions = null;
       if (element.type === 'div' && element.locked) {
-        this.dragState.childrenOriginalPositions = this.elements
+        childrenPositions = this.elements
           .map((el, i) => {
-            if (this.isElementInside(el, element) && i !== index) {
+            if (this.isElementInside(el, element) && i !== elementIndex) {
               return {
                 index: i,
                 left: parseInt(el.style.left) || 0,
@@ -375,165 +423,143 @@ export default {
           .filter(pos => pos !== null);
       }
 
+      this.dragState = {
+        isDragging: true,
+        elementIndex,
+        startX: event.clientX,
+        startY: event.clientY,
+        originalX: parseInt(element.style.left),
+        originalY: parseInt(element.style.top),
+        childrenPositions // 保存子元素位置信息
+      };
+
       // 选中当前拖拽的元素
       this.selectElement(element);
-
-      // 添加临时的全局鼠标移动事件
-      window.addEventListener('mousemove', this.handleDrag);
-      window.addEventListener('mouseup', this.handleDragEnd);
 
       // 阻止默认行为和事件冒泡
       event.preventDefault();
       event.stopPropagation();
     },
 
-    handleDrag(event) {
+    handleMouseMove(event) {
       if (!this.dragState.isDragging) return;
 
-      const index = this.dragState.elementIndex;
-      const element = this.elements[index];
-      
-      // 如果元素被锁定且不是div，不处理移动
-      if (!element || (element.locked && element.type !== 'div')) return;
+      const element = this.elements[this.dragState.elementIndex];
+      if (!element) return;
 
-      // 计算新位置
-      let deltaX = event.clientX - this.dragState.startX;
-      let deltaY = event.clientY - this.dragState.startY;
-      
-      let newLeft = this.dragState.originalX + deltaX;
-      let newTop = this.dragState.originalY + deltaY;
+      const dx = event.clientX - this.dragState.startX;
+      const dy = event.clientY - this.dragState.startY;
 
-      // 防止元素完全拖出设计面板
-      const designPanel = document.querySelector('.design-panel');
-      if (designPanel) {
-        const panelRect = designPanel.getBoundingClientRect();
-        const elementRect = {
-          width: parseInt(element.style.width) || 100,
-          height: parseInt(element.style.height) || 30
-        };
+      let newX = this.dragState.originalX + dx;
+      let newY = this.dragState.originalY + dy;
 
-        // 确保至少有20px在面板内
-        const minVisible = 20;
-        newLeft = Math.max(-elementRect.width + minVisible, Math.min(newLeft, panelRect.width - minVisible));
-        newTop = Math.max(-elementRect.height + minVisible, Math.min(newTop, panelRect.height - minVisible));
-      }
-
-      // 如果是锁定的div，只处理对齐但不处理子元素的对齐
-      if (!(element.type === 'div' && element.locked)) {
-        // 处理对齐
-        if (this.enableSnap) {
-          this.snapLines.vertical = null;
-          this.snapLines.horizontal = null;
-
-          const snapThreshold = 5;
-          const currentRect = {
-            left: newLeft,
-            right: newLeft + (parseInt(element.style.width) || 100),
-            top: newTop,
-            bottom: newTop + (parseInt(element.style.height) || 30),
-            center: newLeft + (parseInt(element.style.width) || 100) / 2,
-            middle: newTop + (parseInt(element.style.height) || 30) / 2
-          };
-
-          this.elements.forEach((other, otherIndex) => {
-            if (otherIndex === index || (element.type === 'div' && this.isElementInside(other, element))) {
-              return;
-            }
-
-            const otherRect = {
-              left: parseInt(other.style.left) || 0,
-              right: (parseInt(other.style.left) || 0) + (parseInt(other.style.width) || 100),
-              top: parseInt(other.style.top) || 0,
-              bottom: (parseInt(other.style.top) || 0) + (parseInt(other.style.height) || 30),
-              center: (parseInt(other.style.left) || 0) + (parseInt(other.style.width) || 100) / 2,
-              middle: (parseInt(other.style.top) || 0) + (parseInt(other.style.height) || 30) / 2
-            };
-
-            // 左对齐
-            if (Math.abs(currentRect.left - otherRect.left) < snapThreshold) {
-              newLeft = otherRect.left;
-              this.snapLines.vertical = newLeft;
-            }
-            // 右对齐
-            else if (Math.abs(currentRect.right - otherRect.right) < snapThreshold) {
-              newLeft = otherRect.right - (parseInt(element.style.width) || 100);
-              this.snapLines.vertical = otherRect.right;
-            }
-            // 中心对齐
-            else if (Math.abs(currentRect.center - otherRect.center) < snapThreshold) {
-              newLeft = otherRect.center - (parseInt(element.style.width) || 100) / 2;
-              this.snapLines.vertical = otherRect.center;
-            }
-
-            // 顶部对齐
-            if (Math.abs(currentRect.top - otherRect.top) < snapThreshold) {
-              newTop = otherRect.top;
-              this.snapLines.horizontal = newTop;
-            }
-            // 底部对齐
-            else if (Math.abs(currentRect.bottom - otherRect.bottom) < snapThreshold) {
-              newTop = otherRect.bottom - (parseInt(element.style.height) || 30);
-              this.snapLines.horizontal = otherRect.bottom;
-            }
-            // 中间对齐
-            else if (Math.abs(currentRect.middle - otherRect.middle) < snapThreshold) {
-              newTop = otherRect.middle - (parseInt(element.style.height) || 30) / 2;
-              this.snapLines.horizontal = otherRect.middle;
-            }
-          });
-        }
+      // 如果启用了对齐功能，检查是否需要对齐
+      if (this.enableSnap) {
+        const snapResult = this.checkSnap(newX, newY, element);
+        newX = snapResult.x;
+        newY = snapResult.y;
       }
 
       // 更新元素位置
-      element.style.left = newLeft + 'px';
-      element.style.top = newTop + 'px';
+      element.style.left = `${newX}px`;
+      element.style.top = `${newY}px`;
 
-      // 如果是锁定的div容器，同时移动其中的元素
-      if (element.type === 'div' && element.locked && this.dragState.childrenOriginalPositions) {
-        this.dragState.childrenOriginalPositions.forEach(pos => {
+      // 如果是锁定的div，同时移动其中的元素
+      if (element.type === 'div' && element.locked && this.dragState.childrenPositions) {
+        this.dragState.childrenPositions.forEach(pos => {
           const child = this.elements[pos.index];
-          child.style.left = (pos.left + deltaX) + 'px';
-          child.style.top = (pos.top + deltaY) + 'px';
+          if (child) {
+            child.style.left = `${pos.left + dx}px`;
+            child.style.top = `${pos.top + dy}px`;
+          }
         });
       }
     },
 
-    handleDragEnd() {
-      if (!this.dragState.isDragging) return;
+    handleMouseUp() {
+      // 如果正在拖拽，处理拖拽结束
+      if (this.dragState.isDragging) {
+        this.dragState = {
+          isDragging: false,
+          elementIndex: -1,
+          startX: 0,
+          startY: 0,
+          originalX: 0,
+          originalY: 0
+        };
+      }
 
-      // 移除临时的全局事件监听
-      window.removeEventListener('mousemove', this.handleDrag);
-      window.removeEventListener('mouseup', this.handleDragEnd);
-
-      // 重置拖拽状态
-      this.dragState.isDragging = false;
-      this.dragState.elementIndex = -1;
-      this.dragState.childrenOriginalPositions = null;
+      // 如果正在调整大小，处理调整结束
+      if (this.resizeState.isResizing) {
+        this.stopResize();
+      }
 
       // 清除对齐线
       this.snapLines.vertical = null;
       this.snapLines.horizontal = null;
     },
-    isElementInside(element1, element2) {
-      const rect1 = {
-        left: parseInt(element1.style.left),
-        top: parseInt(element1.style.top),
-        right: parseInt(element1.style.left) + (element1.type === 'div' ? parseInt(element1.style.width) : 100),
-        bottom: parseInt(element1.style.top) + (element1.type === 'div' ? parseInt(element1.style.height) : 30)
-      }
-      
-      const rect2 = {
-        left: parseInt(element2.style.left),
-        top: parseInt(element2.style.top),
-        right: parseInt(element2.style.left) + parseInt(element2.style.width),
-        bottom: parseInt(element2.style.top) + parseInt(element2.style.height)
-      }
-      
-      return rect1.left >= rect2.left && 
-             rect1.right <= rect2.right && 
-             rect1.top >= rect2.top && 
-             rect1.bottom <= rect2.bottom
+
+    checkSnap(x, y, element) {
+      const snapThreshold = 5;
+      const currentRect = {
+        left: x,
+        right: x + (parseInt(element.style.width) || 100),
+        top: y,
+        bottom: y + (parseInt(element.style.height) || 30),
+        center: x + (parseInt(element.style.width) || 100) / 2,
+        middle: y + (parseInt(element.style.height) || 30) / 2
+      };
+
+      this.elements.forEach((other, otherIndex) => {
+        if (otherIndex === this.dragState.elementIndex) {
+          return;
+        }
+
+        const otherRect = {
+          left: parseInt(other.style.left) || 0,
+          right: (parseInt(other.style.left) || 0) + (parseInt(other.style.width) || 100),
+          top: parseInt(other.style.top) || 0,
+          bottom: (parseInt(other.style.top) || 0) + (parseInt(other.style.height) || 30),
+          center: (parseInt(other.style.left) || 0) + (parseInt(other.style.width) || 100) / 2,
+          middle: (parseInt(other.style.top) || 0) + (parseInt(other.style.height) || 30) / 2
+        };
+
+        // 左对齐
+        if (Math.abs(currentRect.left - otherRect.left) < snapThreshold) {
+          x = otherRect.left;
+          this.snapLines.vertical = otherRect.left;
+        }
+        // 右对齐
+        else if (Math.abs(currentRect.right - otherRect.right) < snapThreshold) {
+          x = otherRect.right - (parseInt(element.style.width) || 100);
+          this.snapLines.vertical = otherRect.right;
+        }
+        // 中心对齐
+        else if (Math.abs(currentRect.center - otherRect.center) < snapThreshold) {
+          x = otherRect.center - (parseInt(element.style.width) || 100) / 2;
+          this.snapLines.vertical = otherRect.center;
+        }
+
+        // 顶部对齐
+        if (Math.abs(currentRect.top - otherRect.top) < snapThreshold) {
+          y = otherRect.top;
+          this.snapLines.horizontal = otherRect.top;
+        }
+        // 底部对齐
+        else if (Math.abs(currentRect.bottom - otherRect.bottom) < snapThreshold) {
+          y = otherRect.bottom - (parseInt(element.style.height) || 30);
+          this.snapLines.horizontal = otherRect.bottom;
+        }
+        // 中间对齐
+        else if (Math.abs(currentRect.middle - otherRect.middle) < snapThreshold) {
+          y = otherRect.middle - (parseInt(element.style.height) || 30) / 2;
+          this.snapLines.horizontal = otherRect.middle;
+        }
+      });
+
+      return { x, y };
     },
+
     saveDesign() {
       // 保存设计的逻辑
     },
@@ -558,6 +584,12 @@ export default {
           case 'input':
             elementCode = `<input style="${this.styleToString(style)}" placeholder="请输入..."/>`;
             break;
+          case 'textarea':
+            elementCode = `<textarea style="${this.styleToString(style)}" placeholder="请输入..."></textarea>`;
+            break;
+          case 'select':
+            elementCode = `<select style="${this.styleToString(style)}"><option value="">请选择</option></select>`;
+            break;
           case 'div':
             elementCode = `<div style="${this.styleToString(style)}"></div>`;
             break;
@@ -569,10 +601,10 @@ export default {
       this.sourceCode = code;
       this.showSourceDialog = true;
     },
-    closeSourceDialog() {
+    closeDialog() {
       this.showSourceDialog = false;
     },
-    async copySourceCode() {
+    async saveCode() {
       try {
         await navigator.clipboard.writeText(this.sourceCode);
         alert('代码已复制到剪贴板');
@@ -680,15 +712,25 @@ export default {
     selectElement(element) {
       this.selectedElement = element;
     },
-    handleMouseUp(event) {
-      // 如果正在拖拽，处理拖拽结束
-      if (this.dragState.isDragging) {
-        this.handleDragEnd(event);
-      }
-      // 如果正在调整大小，处理调整结束
-      if (this.resizeState.isResizing) {
-        this.stopResize();
-      }
+    isElementInside(element1, element2) {
+      const rect1 = {
+        left: parseInt(element1.style.left) || 0,
+        top: parseInt(element1.style.top) || 0,
+        right: (parseInt(element1.style.left) || 0) + (parseInt(element1.style.width) || 100),
+        bottom: (parseInt(element1.style.top) || 0) + (parseInt(element1.style.height) || 30)
+      };
+      
+      const rect2 = {
+        left: parseInt(element2.style.left) || 0,
+        top: parseInt(element2.style.top) || 0,
+        right: (parseInt(element2.style.left) || 0) + (parseInt(element2.style.width) || 200),
+        bottom: (parseInt(element2.style.top) || 0) + (parseInt(element2.style.height) || 150)
+      };
+      
+      return rect1.left >= rect2.left && 
+             rect1.right <= rect2.right && 
+             rect1.top >= rect2.top && 
+             rect1.bottom <= rect2.bottom;
     },
   }
 }
@@ -701,7 +743,7 @@ export default {
   flex-direction: column;
 }
 
-.main-toolbar {
+.top-toolbar {
   padding: 8px;
   background-color: #f5f5f5;
   border-bottom: 1px solid #ddd;
@@ -725,109 +767,8 @@ export default {
   background-color: #f0f0f0;
 }
 
-.toolbar-btn.active {
-  background-color: #e6f7ff;
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
 .toolbar-btn i {
   font-size: 14px;
-}
-
-.toolbar {
-  width: 240px;
-  padding: 0;
-  background-color: #f5f5f5;
-  border-right: 1px solid #ddd;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.tool-header {
-  padding: 12px;
-  border-bottom: 1px solid #ddd;
-}
-
-.tool-items {
-  padding: 12px;
-}
-
-.tool-category {
-  margin-bottom: 16px;
-}
-
-.tool-category-title {
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 8px;
-  padding: 0 4px;
-}
-
-.tool-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 4px;
-  padding: 8px 12px;
-  background-color: white;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
-  cursor: move;
-  transition: all 0.2s;
-  font-size: 14px;
-}
-
-.tool-item:hover {
-  border-color: #1890ff;
-  color: #1890ff;
-  background-color: #e6f7ff;
-}
-
-.tool-item i {
-  margin-right: 8px;
-  font-size: 16px;
-  color: #666;
-}
-
-.tool-item:hover i {
-  color: #1890ff;
-}
-
-.toggle-button {
-  width: 100%;
-  padding: 8px 12px;
-  background-color: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  outline: none;
-  transition: all 0.2s;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.toggle-button i {
-  margin-right: 6px;
-  font-size: 16px;
-}
-
-.toggle-button.active {
-  background-color: #1890ff;
-  color: white;
-  border-color: #1890ff;
-}
-
-.toggle-button:hover {
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
-.toggle-button.active:hover {
-  background-color: #40a9ff;
-  color: white;
 }
 
 .design-container {
@@ -877,6 +818,29 @@ export default {
   border-radius: 4px;
   padding: 4px 8px;
   pointer-events: none;
+  box-sizing: border-box;
+}
+
+.design-element textarea {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #ddd;
+  background-color: white;
+  border-radius: 4px;
+  padding: 4px 8px;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.design-element select {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #ddd;
+  background-color: white;
+  border-radius: 4px;
+  padding: 4px 8px;
+  pointer-events: none;
+  box-sizing: border-box;
 }
 
 .lock-icon {
@@ -969,32 +933,39 @@ export default {
   left: 0;
 }
 
-.source-dialog {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.source-dialog pre {
+.dialog {
+  position: absolute;
+  z-index: 1000;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   background-color: white;
+  border-radius: 8px;
   padding: 20px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  width: 80%;
-  height: 80%;
-  overflow: auto;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  width: 600px;
+  height: 400px;
 }
 
-.source-dialog button {
-  margin-top: 20px;
-  padding: 10px 20px;
+.dialog-textarea {
+  width: 100%;
+  height: 150px;
+  border-radius: 4px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  resize: none;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.dialog-buttons button {
+  flex: 1;
+  margin: 0 5px;
+  padding: 8px 12px;
   border: 1px solid #ddd;
   background-color: white;
   border-radius: 4px;
