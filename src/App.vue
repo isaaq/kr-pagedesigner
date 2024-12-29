@@ -51,37 +51,33 @@
           <div v-if="item.type === 'text'" 
                :style="item.style"
                class="design-element"
-               draggable="true"
-               @dragstart="onElementDragStart($event, index)"
-               @drag="onElementDrag($event, index)"
-               @dragend="onElementDragEnd($event, index)">
+               :class="{ selected: selectedElement === item }"
+               @mousedown="startDrag($event, index)"
+               @click="selectElement(item)">
             示例文本
           </div>
           <div v-else-if="item.type === 'button'" 
                :style="item.style"
                class="design-element"
-               draggable="true"
-               @dragstart="onElementDragStart($event, index)"
-               @drag="onElementDrag($event, index)"
-               @dragend="onElementDragEnd($event, index)">
+               :class="{ selected: selectedElement === item }"
+               @mousedown="startDrag($event, index)"
+               @click="selectElement(item)">
             <button style="width: 100%; height: 100%;">按钮</button>
           </div>
           <div v-else-if="item.type === 'input'" 
                :style="item.style"
                class="design-element"
-               draggable="true"
-               @dragstart="onElementDragStart($event, index)"
-               @drag="onElementDrag($event, index)"
-               @dragend="onElementDragEnd($event, index)">
+               :class="{ selected: selectedElement === item }"
+               @mousedown="startDrag($event, index)"
+               @click="selectElement(item)">
             <input type="text" placeholder="请输入..." style="width: 100%; height: 100%;" />
           </div>
           <div v-else-if="item.type === 'div'" 
                :style="item.style"
                class="design-element"
-               :draggable="!resizeState.isResizing"
-               @dragstart="onElementDragStart($event, index)"
-               @drag="onElementDrag($event, index)"
-               @dragend="onElementDragEnd($event, index)">
+               :class="{ selected: selectedElement === item }"
+               @mousedown="startDrag($event, index)"
+               @click="selectElement(item)">
             <div class="lock-icon" @click.stop="toggleLock(index)">
               {{ item.locked ? '🔒' : '🔓' }}
             </div>
@@ -96,6 +92,75 @@
             <div class="resize-handle left" @mousedown.prevent.stop="startResize($event, index, 'left')"></div>
           </div>
         </template>
+      </div>
+      <div class="attribute-panel" :class="{ collapsed: isPanelCollapsed }">
+        <div class="panel-header">
+          <div class="collapse-button" @click="togglePanel">
+            <i class="fas" :class="isPanelCollapsed ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
+          </div>
+          <h3>属性设置</h3>
+        </div>
+        <div class="panel-content" v-if="selectedElement">
+          <div class="property-group">
+            <div class="property-title">位置和大小</div>
+            <div class="property-item">
+              <label>X 坐标</label>
+              <div class="input-with-unit">
+                <input type="number" :value="elementLeft" @input="updateElementLeft($event.target.value)">
+                <span class="unit">px</span>
+              </div>
+            </div>
+            <div class="property-item">
+              <label>Y 坐标</label>
+              <div class="input-with-unit">
+                <input type="number" :value="elementTop" @input="updateElementTop($event.target.value)">
+                <span class="unit">px</span>
+              </div>
+            </div>
+            <div class="property-item">
+              <label>宽度</label>
+              <div class="input-with-unit">
+                <input type="number" :value="elementWidth" @input="updateElementWidth($event.target.value)">
+                <span class="unit">px</span>
+              </div>
+            </div>
+            <div class="property-item">
+              <label>高度</label>
+              <div class="input-with-unit">
+                <input type="number" :value="elementHeight" @input="updateElementHeight($event.target.value)">
+                <span class="unit">px</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="property-group">
+            <div class="property-title">样式</div>
+            <div class="property-item">
+              <label>背景色</label>
+              <input type="color" :value="elementBgColor" @input="updateElementBgColor($event.target.value)" class="color-input">
+            </div>
+            <div class="property-item">
+              <label>边框</label>
+              <div class="input-with-unit">
+                <input type="number" :value="elementBorderWidth" @input="updateElementBorderWidth($event.target.value)" min="0">
+                <span class="unit">px</span>
+              </div>
+              <input type="color" :value="elementBorderColor" @input="updateElementBorderColor($event.target.value)" class="color-input">
+            </div>
+            <div class="property-item">
+              <label>圆角</label>
+              <div class="input-with-unit">
+                <input type="number" :value="elementBorderRadius" @input="updateElementBorderRadius($event.target.value)" min="0">
+                <span class="unit">px</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-content" v-else>
+          <div class="no-selection">
+            请选择一个元素
+          </div>
+        </div>
       </div>
     </div>
     <div v-if="showSourceDialog" class="source-dialog">
@@ -114,43 +179,126 @@ export default {
       elements: [],
       dragState: {
         isDragging: false,
+        elementIndex: -1,
         startX: 0,
         startY: 0,
-        elementIndex: -1,
         originalX: 0,
         originalY: 0,
         childrenOriginalPositions: null // 用于存储子元素的初始位置
       },
       resizeState: {
         isResizing: false,
-        elementIndex: -1,
         handle: null,
         startX: 0,
         startY: 0,
         originalWidth: 0,
         originalHeight: 0,
-        originalLeft: 0,
-        originalTop: 0
+        elementIndex: -1
       },
       currentTool: 'pointer',
       showSourceDialog: false,
       sourceCode: '',
-      enableSnap: false,
+      enableSnap: true,
       snapLines: {
         vertical: null,
         horizontal: null
+      },
+      isPanelCollapsed: false,
+      selectedElement: null
+    }
+  },
+  computed: {
+    elementLeft: {
+      get() {
+        return this.selectedElement ? parseInt(this.selectedElement.style.left) || 0 : 0;
+      },
+      set(value) {
+        if (this.selectedElement) {
+          this.selectedElement.style.left = value + 'px';
+        }
+      }
+    },
+    elementTop: {
+      get() {
+        return this.selectedElement ? parseInt(this.selectedElement.style.top) || 0 : 0;
+      },
+      set(value) {
+        if (this.selectedElement) {
+          this.selectedElement.style.top = value + 'px';
+        }
+      }
+    },
+    elementWidth: {
+      get() {
+        return this.selectedElement ? parseInt(this.selectedElement.style.width) || 100 : 100;
+      },
+      set(value) {
+        if (this.selectedElement) {
+          this.selectedElement.style.width = value + 'px';
+        }
+      }
+    },
+    elementHeight: {
+      get() {
+        return this.selectedElement ? parseInt(this.selectedElement.style.height) || 30 : 30;
+      },
+      set(value) {
+        if (this.selectedElement) {
+          this.selectedElement.style.height = value + 'px';
+        }
+      }
+    },
+    elementBgColor: {
+      get() {
+        return this.selectedElement ? this.selectedElement.style.backgroundColor || '#ffffff' : '#ffffff';
+      },
+      set(value) {
+        if (this.selectedElement) {
+          this.selectedElement.style.backgroundColor = value;
+        }
+      }
+    },
+    elementBorderWidth: {
+      get() {
+        return this.selectedElement ? parseInt(this.selectedElement.style.borderWidth) || 0 : 0;
+      },
+      set(value) {
+        if (this.selectedElement) {
+          this.selectedElement.style.borderWidth = value + 'px';
+          this.selectedElement.style.borderStyle = value > 0 ? 'solid' : 'none';
+        }
+      }
+    },
+    elementBorderColor: {
+      get() {
+        return this.selectedElement ? this.selectedElement.style.borderColor || '#000000' : '#000000';
+      },
+      set(value) {
+        if (this.selectedElement) {
+          this.selectedElement.style.borderColor = value;
+        }
+      }
+    },
+    elementBorderRadius: {
+      get() {
+        return this.selectedElement ? parseInt(this.selectedElement.style.borderRadius) || 0 : 0;
+      },
+      set(value) {
+        if (this.selectedElement) {
+          this.selectedElement.style.borderRadius = value + 'px';
+        }
       }
     }
   },
   mounted() {
     // 添加全局鼠标事件监听
     window.addEventListener('mousemove', this.handleResize)
-    window.addEventListener('mouseup', this.stopResize)
+    window.addEventListener('mouseup', this.handleMouseUp)
   },
   beforeDestroy() {
     // 移除全局事件监听
     window.removeEventListener('mousemove', this.handleResize)
-    window.removeEventListener('mouseup', this.stopResize)
+    window.removeEventListener('mouseup', this.handleMouseUp)
   },
   methods: {
     onDragStart(event, type) {
@@ -191,137 +339,180 @@ export default {
         this.elements.push(element)
       }
     },
-    onElementDragStart(event, index) {
+    startDrag(event, index) {
       // 如果是从缩放控制点开始的，不触发拖拽
       if (event.target.classList.contains('resize-handle')) {
-        event.preventDefault();
         return;
       }
 
-      const rect = event.target.getBoundingClientRect()
-      const style = this.elements[index].style
+      const element = this.elements[index];
       
-      // 清除type数据，这样可以区分是新建还是移动
-      event.dataTransfer.setData('text', '') 
-      
-      this.dragState = {
-        isDragging: true,
-        startX: event.clientX,
-        startY: event.clientY,
-        elementIndex: index,
-        originalX: parseInt(style.left),
-        originalY: parseInt(style.top),
-        childrenOriginalPositions: null // 用于存储子元素的初始位置
+      // 如果元素被锁定且不是div，阻止拖动
+      if (element.locked && element.type !== 'div') {
+        return;
       }
 
-      // 如果是锁定状态的 div，记录内部元素的初始位置
-      const element = this.elements[index]
+      this.dragState.isDragging = true;
+      this.dragState.elementIndex = index;
+      this.dragState.startX = event.clientX;
+      this.dragState.startY = event.clientY;
+      this.dragState.originalX = parseInt(element.style.left) || 0;
+      this.dragState.originalY = parseInt(element.style.top) || 0;
+
+      // 存储所有子元素的初始位置
       if (element.type === 'div' && element.locked) {
-        this.dragState.childrenOriginalPositions = this.elements.map((el, idx) => {
-          if (idx !== index && this.isElementInside(el, element)) {
-            return {
-              index: idx,
-              left: parseInt(el.style.left),
-              top: parseInt(el.style.top)
+        this.dragState.childrenOriginalPositions = this.elements
+          .map((el, i) => {
+            if (this.isElementInside(el, element) && i !== index) {
+              return {
+                index: i,
+                left: parseInt(el.style.left) || 0,
+                top: parseInt(el.style.top) || 0
+              };
             }
-          }
-          return null
-        }).filter(pos => pos !== null)
+            return null;
+          })
+          .filter(pos => pos !== null);
       }
+
+      // 选中当前拖拽的元素
+      this.selectElement(element);
+
+      // 添加临时的全局鼠标移动事件
+      window.addEventListener('mousemove', this.handleDrag);
+      window.addEventListener('mouseup', this.handleDragEnd);
+
+      // 阻止默认行为和事件冒泡
+      event.preventDefault();
+      event.stopPropagation();
     },
-    onElementDrag(event, index) {
-      if (!this.dragState.isDragging || this.dragState.elementIndex !== index) return
 
-      const dx = event.clientX - this.dragState.startX
-      const dy = event.clientY - this.dragState.startY
-      
-      const element = this.elements[index]
-      
-      let newLeft = this.dragState.originalX + dx
-      let newTop = this.dragState.originalY + dy
+    handleDrag(event) {
+      if (!this.dragState.isDragging) return;
 
-      // 如果启用了自动对齐
-      if (this.enableSnap) {
-        const snapThreshold = 5; // 吸附阈值
-        const currentRect = {
-          left: newLeft,
-          right: newLeft + parseInt(element.style.width || 100),
-          top: newTop,
-          bottom: newTop + parseInt(element.style.height || 30),
-          center: newLeft + parseInt(element.style.width || 100) / 2,
-          middle: newTop + parseInt(element.style.height || 30) / 2
+      const index = this.dragState.elementIndex;
+      const element = this.elements[index];
+      
+      // 如果元素被锁定且不是div，不处理移动
+      if (!element || (element.locked && element.type !== 'div')) return;
+
+      // 计算新位置
+      let deltaX = event.clientX - this.dragState.startX;
+      let deltaY = event.clientY - this.dragState.startY;
+      
+      let newLeft = this.dragState.originalX + deltaX;
+      let newTop = this.dragState.originalY + deltaY;
+
+      // 防止元素完全拖出设计面板
+      const designPanel = document.querySelector('.design-panel');
+      if (designPanel) {
+        const panelRect = designPanel.getBoundingClientRect();
+        const elementRect = {
+          width: parseInt(element.style.width) || 100,
+          height: parseInt(element.style.height) || 30
+        };
+
+        // 确保至少有20px在面板内
+        const minVisible = 20;
+        newLeft = Math.max(-elementRect.width + minVisible, Math.min(newLeft, panelRect.width - minVisible));
+        newTop = Math.max(-elementRect.height + minVisible, Math.min(newTop, panelRect.height - minVisible));
+      }
+
+      // 如果是锁定的div，只处理对齐但不处理子元素的对齐
+      if (!(element.type === 'div' && element.locked)) {
+        // 处理对齐
+        if (this.enableSnap) {
+          this.snapLines.vertical = null;
+          this.snapLines.horizontal = null;
+
+          const snapThreshold = 5;
+          const currentRect = {
+            left: newLeft,
+            right: newLeft + (parseInt(element.style.width) || 100),
+            top: newTop,
+            bottom: newTop + (parseInt(element.style.height) || 30),
+            center: newLeft + (parseInt(element.style.width) || 100) / 2,
+            middle: newTop + (parseInt(element.style.height) || 30) / 2
+          };
+
+          this.elements.forEach((other, otherIndex) => {
+            if (otherIndex === index || (element.type === 'div' && this.isElementInside(other, element))) {
+              return;
+            }
+
+            const otherRect = {
+              left: parseInt(other.style.left) || 0,
+              right: (parseInt(other.style.left) || 0) + (parseInt(other.style.width) || 100),
+              top: parseInt(other.style.top) || 0,
+              bottom: (parseInt(other.style.top) || 0) + (parseInt(other.style.height) || 30),
+              center: (parseInt(other.style.left) || 0) + (parseInt(other.style.width) || 100) / 2,
+              middle: (parseInt(other.style.top) || 0) + (parseInt(other.style.height) || 30) / 2
+            };
+
+            // 左对齐
+            if (Math.abs(currentRect.left - otherRect.left) < snapThreshold) {
+              newLeft = otherRect.left;
+              this.snapLines.vertical = newLeft;
+            }
+            // 右对齐
+            else if (Math.abs(currentRect.right - otherRect.right) < snapThreshold) {
+              newLeft = otherRect.right - (parseInt(element.style.width) || 100);
+              this.snapLines.vertical = otherRect.right;
+            }
+            // 中心对齐
+            else if (Math.abs(currentRect.center - otherRect.center) < snapThreshold) {
+              newLeft = otherRect.center - (parseInt(element.style.width) || 100) / 2;
+              this.snapLines.vertical = otherRect.center;
+            }
+
+            // 顶部对齐
+            if (Math.abs(currentRect.top - otherRect.top) < snapThreshold) {
+              newTop = otherRect.top;
+              this.snapLines.horizontal = newTop;
+            }
+            // 底部对齐
+            else if (Math.abs(currentRect.bottom - otherRect.bottom) < snapThreshold) {
+              newTop = otherRect.bottom - (parseInt(element.style.height) || 30);
+              this.snapLines.horizontal = otherRect.bottom;
+            }
+            // 中间对齐
+            else if (Math.abs(currentRect.middle - otherRect.middle) < snapThreshold) {
+              newTop = otherRect.middle - (parseInt(element.style.height) || 30) / 2;
+              this.snapLines.horizontal = otherRect.middle;
+            }
+          });
         }
-
-        // 重置辅助线
-        this.snapLines.vertical = null
-        this.snapLines.horizontal = null
-
-        // 遍历其他元素进行对齐
-        this.elements.forEach((other, otherIndex) => {
-          if (otherIndex === index) return
-
-          const otherRect = {
-            left: parseInt(other.style.left),
-            right: parseInt(other.style.left) + parseInt(other.style.width || 100),
-            top: parseInt(other.style.top),
-            bottom: parseInt(other.style.top) + parseInt(other.style.height || 30),
-            center: parseInt(other.style.left) + parseInt(other.style.width || 100) / 2,
-            middle: parseInt(other.style.top) + parseInt(other.style.height || 30) / 2
-          }
-
-          // 左对齐
-          if (Math.abs(currentRect.left - otherRect.left) < snapThreshold) {
-            newLeft = otherRect.left
-            this.snapLines.vertical = otherRect.left
-          }
-          // 右对齐
-          else if (Math.abs(currentRect.right - otherRect.right) < snapThreshold) {
-            newLeft = otherRect.right - parseInt(element.style.width || 100)
-            this.snapLines.vertical = otherRect.right
-          }
-          // 中心对齐
-          else if (Math.abs(currentRect.center - otherRect.center) < snapThreshold) {
-            newLeft = otherRect.center - parseInt(element.style.width || 100) / 2
-            this.snapLines.vertical = otherRect.center
-          }
-
-          // 顶部对齐
-          if (Math.abs(currentRect.top - otherRect.top) < snapThreshold) {
-            newTop = otherRect.top
-            this.snapLines.horizontal = otherRect.top
-          }
-          // 底部对齐
-          else if (Math.abs(currentRect.bottom - otherRect.bottom) < snapThreshold) {
-            newTop = otherRect.bottom - parseInt(element.style.height || 30)
-            this.snapLines.horizontal = otherRect.bottom
-          }
-          // 中间对齐
-          else if (Math.abs(currentRect.middle - otherRect.middle) < snapThreshold) {
-            newTop = otherRect.middle - parseInt(element.style.height || 30) / 2
-            this.snapLines.horizontal = otherRect.middle
-          }
-        })
       }
 
       // 更新元素位置
-      element.style.left = newLeft + 'px'
-      element.style.top = newTop + 'px'
+      element.style.left = newLeft + 'px';
+      element.style.top = newTop + 'px';
 
-      // 如果是锁定状态的 div，同时移动内部元素
+      // 如果是锁定的div容器，同时移动其中的元素
       if (element.type === 'div' && element.locked && this.dragState.childrenOriginalPositions) {
-        const adjustedDx = newLeft - this.dragState.originalX
-        const adjustedDy = newTop - this.dragState.originalY
         this.dragState.childrenOriginalPositions.forEach(pos => {
-          const childElement = this.elements[pos.index]
-          childElement.style.left = (pos.left + adjustedDx) + 'px'
-          childElement.style.top = (pos.top + adjustedDy) + 'px'
-        })
+          const child = this.elements[pos.index];
+          child.style.left = (pos.left + deltaX) + 'px';
+          child.style.top = (pos.top + deltaY) + 'px';
+        });
       }
     },
-    onElementDragEnd(event, index) {
-      this.snapLines.vertical = null
-      this.snapLines.horizontal = null
-      this.dragState.isDragging = false
+
+    handleDragEnd() {
+      if (!this.dragState.isDragging) return;
+
+      // 移除临时的全局事件监听
+      window.removeEventListener('mousemove', this.handleDrag);
+      window.removeEventListener('mouseup', this.handleDragEnd);
+
+      // 重置拖拽状态
+      this.dragState.isDragging = false;
+      this.dragState.elementIndex = -1;
+      this.dragState.childrenOriginalPositions = null;
+
+      // 清除对齐线
+      this.snapLines.vertical = null;
+      this.snapLines.horizontal = null;
     },
     isElementInside(element1, element2) {
       const rect1 = {
@@ -458,7 +649,47 @@ export default {
     },
     toggleSnap() {
       this.enableSnap = !this.enableSnap
-    }
+    },
+    togglePanel() {
+      this.isPanelCollapsed = !this.isPanelCollapsed;
+    },
+    updateElementLeft(value) {
+      this.elementLeft = parseInt(value);
+    },
+    updateElementTop(value) {
+      this.elementTop = parseInt(value);
+    },
+    updateElementWidth(value) {
+      this.elementWidth = parseInt(value);
+    },
+    updateElementHeight(value) {
+      this.elementHeight = parseInt(value);
+    },
+    updateElementBgColor(value) {
+      this.elementBgColor = value;
+    },
+    updateElementBorderWidth(value) {
+      this.elementBorderWidth = parseInt(value);
+    },
+    updateElementBorderColor(value) {
+      this.elementBorderColor = value;
+    },
+    updateElementBorderRadius(value) {
+      this.elementBorderRadius = parseInt(value);
+    },
+    selectElement(element) {
+      this.selectedElement = element;
+    },
+    handleMouseUp(event) {
+      // 如果正在拖拽，处理拖拽结束
+      if (this.dragState.isDragging) {
+        this.handleDragEnd(event);
+      }
+      // 如果正在调整大小，处理调整结束
+      if (this.resizeState.isResizing) {
+        this.stopResize();
+      }
+    },
   }
 }
 </script>
@@ -615,7 +846,13 @@ export default {
 .design-element {
   cursor: move;
   user-select: none;
-  position: relative;
+  position: absolute;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+.design-element.selected {
+  outline: 2px solid #1890ff;
 }
 
 .design-element:hover {
@@ -762,5 +999,148 @@ export default {
   background-color: white;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.attribute-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 300px;
+  background-color: #fff;
+  border-left: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+  z-index: 999;
+}
+
+.attribute-panel.collapsed {
+  transform: translateX(100%);
+}
+
+.collapse-button {
+  position: fixed;
+  right: 300px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 32px;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+  transition: right 0.3s ease;
+}
+
+.collapse-button.collapsed {
+  right: 0;
+}
+
+.collapse-button:hover {
+  background-color: #f0f0f0;
+}
+
+.collapse-button i {
+  font-size: 12px;
+  color: #666;
+}
+
+.panel-header {
+  padding: 16px;
+  border-bottom: 1px solid #ddd;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+  flex: 1;
+}
+
+.panel-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.property-group {
+  margin-bottom: 24px;
+}
+
+.property-title {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.property-item {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.property-item label {
+  width: 60px;
+  font-size: 14px;
+  color: #333;
+}
+
+.input-with-unit {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.input-with-unit input {
+  width: 100%;
+  height: 28px;
+  padding: 4px 24px 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  outline: none;
+}
+
+.input-with-unit input:focus {
+  border-color: #1890ff;
+}
+
+.input-with-unit .unit {
+  position: absolute;
+  right: 8px;
+  color: #999;
+  font-size: 12px;
+}
+
+.no-selection {
+  text-align: center;
+  color: #999;
+  padding: 20px;
+  font-size: 14px;
+}
+
+.color-input {
+  width: 32px;
+  height: 28px;
+  padding: 0 4px;
+  margin-left: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
 }
 </style>
