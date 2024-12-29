@@ -1,116 +1,143 @@
 <template>
   <div class="app">
     <div class="top-toolbar">
-      <button class="toolbar-btn" @click="addElement('text')">
-        <i class="fas fa-font"></i> 文本
-      </button>
-      <button class="toolbar-btn" @click="addElement('button')">
-        <i class="fas fa-square"></i> 按钮
-      </button>
-      <button class="toolbar-btn" @click="addElement('input')">
-        <i class="fas fa-keyboard"></i> 输入框
-      </button>
-      <button class="toolbar-btn" @click="addElement('div')">
-        <i class="fas fa-vector-square"></i> 框选
-      </button>
-      <button class="toolbar-btn" @click="addElement('textarea')">
-        <i class="fas fa-text-height"></i> 文本框
-      </button>
-      <button class="toolbar-btn" @click="addElement('select')">
-        <i class="fas fa-caret-down"></i> 下拉框
-      </button>
-      <button class="toolbar-btn" @click="showSourceCode">
-        <i class="fas fa-code"></i> 源代码
-      </button>
-      <button class="toolbar-btn" @click="toggleSnap">
-        <i class="fas fa-magnet"></i> {{ enableSnap ? '关闭对齐' : '开启对齐' }}
-      </button>
+      <div class="toolbar-group">
+        <button class="toolbar-btn" @click="addElement('text')">
+          <i class="fas fa-font"></i> 文本
+        </button>
+        <button class="toolbar-btn" @click="addElement('button')">
+          <i class="fas fa-square"></i> 按钮
+        </button>
+        <button class="toolbar-btn" @click="addElement('input')">
+          <i class="fas fa-keyboard"></i> 输入框
+        </button>
+        <button class="toolbar-btn" @click="addElement('div')">
+          <i class="fas fa-vector-square"></i> 框选
+        </button>
+        <button class="toolbar-btn" @click="addElement('textarea')">
+          <i class="fas fa-text-height"></i> 文本框
+        </button>
+        <button class="toolbar-btn" @click="addElement('select')">
+          <i class="fas fa-caret-down"></i> 下拉框
+        </button>
+      </div>
+      <div class="toolbar-group">
+        <select class="screen-select" v-model="currentScreen">
+          <option value="desktop">Desktop (1920px)</option>
+          <option value="laptop">Laptop (1366px)</option>
+          <option value="tablet">Tablet (768px)</option>
+          <option value="mobile">Mobile (375px)</option>
+        </select>
+        <div class="zoom-controls">
+          <button class="toolbar-btn" @click="zoomOut">
+            <i class="fas fa-search-minus"></i>
+          </button>
+          <span class="zoom-level">{{ Math.round(scale * 100) }}%</span>
+          <button class="toolbar-btn" @click="zoomIn">
+            <i class="fas fa-search-plus"></i>
+          </button>
+        </div>
+      </div>
+      <div class="toolbar-group">
+        <button class="toolbar-btn" @click="showSourceCode">
+          <i class="fas fa-code"></i> 源代码
+        </button>
+        <button class="toolbar-btn" @click="toggleSnap">
+          <i class="fas fa-magnet"></i> {{ enableSnap ? '关闭对齐' : '开启对齐' }}
+        </button>
+        <button class="toolbar-btn" @click="togglePanel">
+          <i class="fas" :class="isPanelCollapsed ? 'fa-chevron-left' : 'fa-chevron-right'"></i>
+        </button>
+      </div>
     </div>
     <div class="design-container">
       <LeftToolbar />
-      <div class="design-panel" 
-        @dragover.prevent 
-        @drop="onDrop"
-        @mousemove="handleMouseMove"
-        @mouseup="handleMouseUp">
-        <!-- 对齐辅助线 -->
-        <div v-if="enableSnap && snapLines.vertical" 
-             class="snap-line vertical"
-             :style="{ left: snapLines.vertical + 'px' }">
-        </div>
-        <div v-if="enableSnap && snapLines.horizontal" 
-             class="snap-line horizontal"
-             :style="{ top: snapLines.horizontal + 'px' }">
-        </div>
-        <template v-for="(item, index) in elements" :key="item.id">
-          <div v-if="item.type === 'text'" 
-               :style="item.style"
-               class="design-element"
-               :class="{ selected: selectedElement === item }"
-               :data-id="item.id"
-               @mousedown="handleMouseDown"
-               @click="selectElement(item)">
-            示例文本
+      <div class="design-panel-wrapper">
+        <div class="design-panel" 
+          :style="panelStyle"
+          @dragover.prevent 
+          @drop="onDrop"
+          @mousemove="handleMouseMove"
+          @mouseup="handleMouseUp">
+          <!-- 对齐辅助线 -->
+          <div v-if="enableSnap && snapLines.vertical" 
+               class="snap-line vertical"
+               :style="{ left: snapLines.vertical + 'px' }">
           </div>
-          <div v-else-if="item.type === 'button'" 
-               :style="item.style"
-               class="design-element"
-               :class="{ selected: selectedElement === item }"
-               :data-id="item.id"
-               @mousedown="handleMouseDown"
-               @click="selectElement(item)">
-            <button style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc;">按钮</button>
+          <div v-if="enableSnap && snapLines.horizontal" 
+               class="snap-line horizontal"
+               :style="{ top: snapLines.horizontal + 'px' }">
           </div>
-          <div v-else-if="item.type === 'input'" 
-               :style="item.style"
-               class="design-element"
-               :class="{ selected: selectedElement === item }"
-               :data-id="item.id"
-               @mousedown="handleMouseDown"
-               @click="selectElement(item)">
-            <input type="text" placeholder="请输入..." style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" />
-          </div>
-          <div v-else-if="item.type === 'textarea'" 
-               :style="item.style"
-               class="design-element"
-               :class="{ selected: selectedElement === item }"
-               :data-id="item.id"
-               @mousedown="handleMouseDown"
-               @click="selectElement(item)">
-            <textarea placeholder="请输入..." style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; padding: 4px 8px; box-sizing: border-box;"></textarea>
-          </div>
-          <div v-else-if="item.type === 'select'" 
-               :style="item.style"
-               class="design-element"
-               :class="{ selected: selectedElement === item }"
-               :data-id="item.id"
-               @mousedown="handleMouseDown"
-               @click="selectElement(item)">
-            <select style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; padding: 4px 8px; box-sizing: border-box;">
-              <option value="">请选择</option>
-            </select>
-          </div>
-          <div v-else-if="item.type === 'div'" 
-               :style="item.style"
-               class="design-element"
-               :class="{ selected: selectedElement === item }"
-               :data-id="item.id"
-               @mousedown="handleMouseDown"
-               @click="selectElement(item)">
-            <div class="lock-icon" @click.stop="toggleLock(index)">
-              {{ item.locked ? '🔒' : '🔓' }}
+          <template v-for="(item, index) in elements" :key="item.id">
+            <div v-if="item.type === 'text'" 
+                 :style="item.style"
+                 class="design-element"
+                 :class="{ selected: selectedElement === item }"
+                 :data-id="item.id"
+                 @mousedown="handleMouseDown"
+                 @click="selectElement(item)">
+              示例文本
             </div>
-            <!-- 缩放控制点 -->
-            <div class="resize-handle top-left" @mousedown.prevent.stop="startResize($event, index, 'top-left')"></div>
-            <div class="resize-handle top" @mousedown.prevent.stop="startResize($event, index, 'top')"></div>
-            <div class="resize-handle top-right" @mousedown.prevent.stop="startResize($event, index, 'top-right')"></div>
-            <div class="resize-handle right" @mousedown.prevent.stop="startResize($event, index, 'right')"></div>
-            <div class="resize-handle bottom-right" @mousedown.prevent.stop="startResize($event, index, 'bottom-right')"></div>
-            <div class="resize-handle bottom" @mousedown.prevent.stop="startResize($event, index, 'bottom')"></div>
-            <div class="resize-handle bottom-left" @mousedown.prevent.stop="startResize($event, index, 'bottom-left')"></div>
-            <div class="resize-handle left" @mousedown.prevent.stop="startResize($event, index, 'left')"></div>
-          </div>
-        </template>
+            <div v-else-if="item.type === 'button'" 
+                 :style="item.style"
+                 class="design-element"
+                 :class="{ selected: selectedElement === item }"
+                 :data-id="item.id"
+                 @mousedown="handleMouseDown"
+                 @click="selectElement(item)">
+              <button style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc;">按钮</button>
+            </div>
+            <div v-else-if="item.type === 'input'" 
+                 :style="item.style"
+                 class="design-element"
+                 :class="{ selected: selectedElement === item }"
+                 :data-id="item.id"
+                 @mousedown="handleMouseDown"
+                 @click="selectElement(item)">
+              <input type="text" placeholder="请输入..." style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box;" />
+            </div>
+            <div v-else-if="item.type === 'textarea'" 
+                 :style="item.style"
+                 class="design-element"
+                 :class="{ selected: selectedElement === item }"
+                 :data-id="item.id"
+                 @mousedown="handleMouseDown"
+                 @click="selectElement(item)">
+              <textarea placeholder="请输入..." style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; padding: 4px 8px; box-sizing: border-box;"></textarea>
+            </div>
+            <div v-else-if="item.type === 'select'" 
+                 :style="item.style"
+                 class="design-element"
+                 :class="{ selected: selectedElement === item }"
+                 :data-id="item.id"
+                 @mousedown="handleMouseDown"
+                 @click="selectElement(item)">
+              <select style="width: 100%; height: 100%; border-radius: 4px; border: 1px solid #ccc; padding: 4px 8px; box-sizing: border-box;">
+                <option value="">请选择</option>
+              </select>
+            </div>
+            <div v-else-if="item.type === 'div'" 
+                 :style="item.style"
+                 class="design-element"
+                 :class="{ selected: selectedElement === item }"
+                 :data-id="item.id"
+                 @mousedown="handleMouseDown"
+                 @click="selectElement(item)">
+              <div class="lock-icon" @click.stop="toggleLock(index)">
+                {{ item.locked ? '🔒' : '🔓' }}
+              </div>
+              <!-- 缩放控制点 -->
+              <div class="resize-handle top-left" @mousedown.prevent.stop="startResize($event, index, 'top-left')"></div>
+              <div class="resize-handle top" @mousedown.prevent.stop="startResize($event, index, 'top')"></div>
+              <div class="resize-handle top-right" @mousedown.prevent.stop="startResize($event, index, 'top-right')"></div>
+              <div class="resize-handle right" @mousedown.prevent.stop="startResize($event, index, 'right')"></div>
+              <div class="resize-handle bottom-right" @mousedown.prevent.stop="startResize($event, index, 'bottom-right')"></div>
+              <div class="resize-handle bottom" @mousedown.prevent.stop="startResize($event, index, 'bottom')"></div>
+              <div class="resize-handle bottom-left" @mousedown.prevent.stop="startResize($event, index, 'bottom-left')"></div>
+              <div class="resize-handle left" @mousedown.prevent.stop="startResize($event, index, 'left')"></div>
+            </div>
+          </template>
+        </div>
       </div>
       <div class="attribute-panel" :class="{ collapsed: isPanelCollapsed }">
         <div class="panel-header">
@@ -229,7 +256,15 @@ export default {
         horizontal: null
       },
       isPanelCollapsed: false,
-      selectedElement: null
+      selectedElement: null,
+      currentScreen: 'desktop',
+      screenSizes: {
+        desktop: { width: 1920, height: 1080 },
+        laptop: { width: 1366, height: 768 },
+        tablet: { width: 768, height: 1024 },
+        mobile: { width: 375, height: 667 }
+      },
+      scale: 0.5,
     }
   },
   computed: {
@@ -313,17 +348,35 @@ export default {
           this.selectedElement.style.borderRadius = value + 'px';
         }
       }
+    },
+    panelStyle() {
+      const size = this.screenSizes[this.currentScreen];
+      return {
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        transform: `scale(${this.scale})`,
+        transformOrigin: 'top left',
+        backgroundColor: '#ffffff',
+        position: 'relative',
+        transition: 'width 0.3s, height 0.3s, transform 0.3s'
+      }
     }
   },
   mounted() {
     // 添加全局鼠标事件监听
     window.addEventListener('mousemove', this.handleMouseMove)
     window.addEventListener('mouseup', this.handleMouseUp)
+    // 添加自适应缩放
+    this.$nextTick(() => {
+      this.adjustScaleToFit();
+      window.addEventListener('resize', this.adjustScaleToFit);
+    });
   },
   beforeDestroy() {
     // 移除全局事件监听
     window.removeEventListener('mousemove', this.handleMouseMove)
     window.removeEventListener('mouseup', this.handleMouseUp)
+    window.removeEventListener('resize', this.adjustScaleToFit)
   },
   methods: {
     onDrop(event) {
@@ -732,6 +785,22 @@ export default {
              rect1.top >= rect2.top && 
              rect1.bottom <= rect2.bottom;
     },
+    adjustScaleToFit() {
+      const wrapper = document.querySelector('.design-panel-wrapper');
+      if (!wrapper) return;
+      const containerWidth = wrapper.clientWidth - 40;
+      const containerHeight = wrapper.clientHeight - 40;
+      const size = this.screenSizes[this.currentScreen];
+      const scaleX = containerWidth / size.width;
+      const scaleY = containerHeight / size.height;
+      this.scale = Math.min(Math.min(scaleX, scaleY), 2); // 确保缩放比例不超过1
+    },
+    zoomIn() {
+      this.scale += 0.1;
+    },
+    zoomOut() {
+      this.scale = Math.max(this.scale - 0.1, 0.1);
+    },
   }
 }
 </script>
@@ -748,6 +817,13 @@ export default {
   background-color: #f5f5f5;
   border-bottom: 1px solid #ddd;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -773,15 +849,26 @@ export default {
 
 .design-container {
   display: flex;
-  height: 100vh;
+  height: calc(100vh - 50px);
+  overflow: hidden;
+}
+
+.design-panel-wrapper {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background-color: #f0f0f0;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
 }
 
 .design-panel {
-  flex: 1;
-  position: relative;
   background-color: white;
-  overflow: auto;
-  min-height: 100vh;
+  border: 1px solid #ddd;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
 }
 
 .design-element {
@@ -1113,5 +1200,30 @@ export default {
 .color-input::-webkit-color-swatch {
   border: none;
   border-radius: 2px;
+}
+
+.screen-select {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-left: 1px solid #ddd;
+  margin-left: 8px;
+}
+
+.zoom-level {
+  font-size: 14px;
+  color: #666;
+  min-width: 50px;
+  text-align: center;
 }
 </style>
